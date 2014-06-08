@@ -75,17 +75,29 @@ void GivePublicPmidKey(const NodeId& node_id, routing::GivePublicKeyFunctor give
   }
 }
 
+void WaitForHealth(int& current_health, std::mutex& network_health_mutex,
+                   std::condition_variable& network_health_cv, int required_health) {
+  std::unique_lock<std::mutex> lock(network_health_mutex);
+  network_health_cv.wait(
+      lock, [&] { return current_health == required_health; });
+}
+
 void StartZeroStateRoutingNodes(LocalNetworkController* local_network_controller,
                                 std::promise<void>& zero_state_nodes_started,
-                                std::future<void> finished_with_zero_state_nodes) {
+                                std::future<void> finished_with_zero_state_nodes,
+                                std::promise<void>& added_first_vault,
+                                std::promise<void>& added_second_vault) {
   try {
     TLOG(kDefaultColour) << "Creating two zero state routing nodes\n";
-    AsioService asio_service{ 1 };
     std::unique_ptr<routing::Routing> node0{
         maidsafe::make_unique<routing::Routing>(GetPmidAndSigner(0).first) };
     routing::NodeInfo node_info0;
     node_info0.node_id = NodeId{ GetPmidAndSigner(0).first.name()->string() };
     node_info0.public_key = GetPmidAndSigner(0).first.public_key();
+
+    std::mutex network_health_mutex;
+    std::condition_variable network_health_cv;
+    int network_health0(-1), network_health1(-1);
 
     std::unique_ptr<routing::Routing> node1{
         maidsafe::make_unique<routing::Routing>(GetPmidAndSigner(1).first) };
@@ -93,14 +105,21 @@ void StartZeroStateRoutingNodes(LocalNetworkController* local_network_controller
     node_info1.node_id = NodeId{ GetPmidAndSigner(1).first.name()->string() };
     node_info1.public_key = GetPmidAndSigner(1).first.public_key();
 
-    nfs_client::DataGetter public_key_getter{ asio_service, *node0 };
-
     routing::Functors functors0, functors1;
     auto public_pmids = GetPublicPmids();  // from env
     functors0.request_public_key = functors1.request_public_key =
        [public_pmids](NodeId node_id, const routing::GivePublicKeyFunctor& give_key) {
          GivePublicPmidKey(node_id, give_key, public_pmids);
     };
+
+    functors0.network_status = [&](int network_health) {
+        routing::UpdateNetworkHealth(network_health, network_health0, network_health_mutex,
+                                     network_health_cv, node_info0.node_id); };
+
+    functors1.network_status = [&](int network_health) {
+        routing::UpdateNetworkHealth(network_health, network_health1, network_health_mutex,
+                                     network_health_cv, node_info1.node_id); };
+
     functors0.typed_message_and_caching.group_to_group.message_received =
         functors1.typed_message_and_caching.group_to_group.message_received =
             [&](const routing::GroupToGroupMessage&) {};
@@ -130,7 +149,23 @@ void StartZeroStateRoutingNodes(LocalNetworkController* local_network_controller
 
     routing::WriteBootstrapFile(routing::BootstrapContacts{ contact0, contact1 },
                                 local_network_controller->test_env_root_dir / kBootstrapFilename);
+    TLOG(kRed) << "WaitForHealth network_health0  for 1 \n";
+    WaitForHealth(network_health0, network_health_mutex, network_health_cv, 1);
+    TLOG(kRed) << "WaitForHealth network_health1  for 1 \n";
+
+    WaitForHealth(network_health1, network_health_mutex, network_health_cv, 1);
+
     zero_state_nodes_started.set_value();
+
+    WaitForHealth(network_health0, network_health_mutex, network_health_cv, 3);
+    WaitForHealth(network_health1, network_health_mutex, network_health_cv, 3);
+
+    added_first_vault.set_value();
+
+    WaitForHealth(network_health0, network_health_mutex, network_health_cv, 4);
+    WaitForHealth(network_health1, network_health_mutex, network_health_cv, 4);
+
+    added_second_vault.set_value();
 
     finished_with_zero_state_nodes.get();
     TLOG(kDefaultColour) << "Shutting down zero state routing nodes\n";
@@ -148,32 +183,19 @@ void StartVaultManagerAndClientInterface(LocalNetworkController* local_network_c
       maidsafe::make_unique<ClientInterface>(maid_and_signer.first);
 }
 
-void StartFirstTwoVaults(LocalNetworkController* local_network_controller, DiskUsage max_usage) {
-  TLOG(kDefaultColour) << "Starting vault 1\n";  // index 2 in pmid list
-  std::string vault_dir_name{ DebugId(GetPmidAndSigner(2).first.name().value) };
+void StartVault(LocalNetworkController* local_network_controller, DiskUsage max_usage,
+                     int index) {
+  TLOG(kDefaultColour) << "Starting vault " << index -1 << "\n";  // index 2 in pmid list
+  std::string vault_dir_name{ DebugId(GetPmidAndSigner(index).first.name().value) };
   fs::create_directories(local_network_controller->test_env_root_dir / vault_dir_name);
-  auto first_vault_future(local_network_controller->client_interface->StartVault(
-      local_network_controller->test_env_root_dir / vault_dir_name, max_usage, 2));
+  auto vault_future(local_network_controller->client_interface->StartVault(
+      local_network_controller->test_env_root_dir / vault_dir_name, max_usage, index));
   try {
-    first_vault_future.get();
+    vault_future.get();
   }
   catch (const std::exception& e) {
     LOG(kWarning) << boost::diagnostic_information(e);
   }
-  Sleep(std::chrono::seconds(1));
-
-  TLOG(kDefaultColour) << "Starting vault 2\n";  // index 3 in pmid list
-  vault_dir_name = DebugId(GetPmidAndSigner(3).first.name().value);
-  fs::create_directories(local_network_controller->test_env_root_dir / vault_dir_name);
-  auto second_vault_future(local_network_controller->client_interface->StartVault(
-      local_network_controller->test_env_root_dir / vault_dir_name, max_usage, 3));
-  try {
-    second_vault_future.get();
-  }
-  catch (const std::exception& e) {
-    LOG(kWarning) << boost::diagnostic_information(e);
-  }
-  Sleep(std::chrono::seconds(1));
 }
 
 void StartRemainingVaults(LocalNetworkController* local_network_controller, DiskUsage max_usage) {
@@ -286,17 +308,24 @@ void StartNetwork(LocalNetworkController* local_network_controller) {
 
   auto space_info(fs::space(local_network_controller->test_env_root_dir));
   DiskUsage max_usage{ (9 * space_info.available) / (10 * local_network_controller->vault_count) };
-  std::promise<void> zero_state_nodes_started, finished_with_zero_state_nodes;
+  std::promise<void> zero_state_nodes_started, finished_with_zero_state_nodes, added_first_vault,
+                     added_second_vault;
   std::thread zero_state_launcher;
   try {
     zero_state_launcher = std::move(std::thread{
         [&] { StartZeroStateRoutingNodes(local_network_controller, zero_state_nodes_started,
-                                         finished_with_zero_state_nodes.get_future());
+                                         finished_with_zero_state_nodes.get_future(),
+                                         added_first_vault,
+                                         added_second_vault);
             } });
     zero_state_nodes_started.get_future().get();
-    Sleep(std::chrono::seconds(1));
+
     StartVaultManagerAndClientInterface(local_network_controller);
-    StartFirstTwoVaults(local_network_controller, max_usage);
+    StartVault(local_network_controller, max_usage, 2);
+    added_first_vault.get_future().get();
+
+    StartVault(local_network_controller, max_usage, 3);
+    added_second_vault.get_future().get();
 
     finished_with_zero_state_nodes.set_value();
     zero_state_launcher.join();
