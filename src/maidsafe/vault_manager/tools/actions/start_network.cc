@@ -330,6 +330,7 @@ void StartNetwork(LocalNetworkController* local_network_controller) {
 
     finished_with_zero_state_nodes.set_value();
     zero_state_launcher.join();
+    TLOG(kDefaultColour) << "zero_state_launcher.join() returned !!\n";
   }
   catch (const std::exception&) {
     finished_with_zero_state_nodes.set_value();
