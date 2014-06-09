@@ -326,6 +326,7 @@ void StartNetwork(LocalNetworkController* local_network_controller) {
 
     StartVault(local_network_controller, max_usage, 3);
     added_second_vault.get_future().get();
+    Sleep(std::chrono::milliseconds(500)); // need first and second vault to connect to each other
 
     finished_with_zero_state_nodes.set_value();
     zero_state_launcher.join();
@@ -335,7 +336,7 @@ void StartNetwork(LocalNetworkController* local_network_controller) {
     zero_state_launcher.join();
     throw;
   }
-  Sleep(std::chrono::seconds(2));
+  Sleep(std::chrono::milliseconds(500));
 
   routing::WriteBootstrapFile(
       routing::BootstrapContacts{ 1, routing::BootstrapContact{ GetLocalIp(), kLivePort } },
