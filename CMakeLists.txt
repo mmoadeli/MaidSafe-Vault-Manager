@@ -81,7 +81,7 @@ if(MaidsafeTesting)
   target_include_directories(TESTvault_manager PRIVATE ${PROJECT_SOURCE_DIR}/src)
   ms_add_executable(dummy_vault "Tests/Vault Manager" "${VaultManagerSourcesDir}/tests/dummy_vault.cc")
 
-  target_link_libraries(TESTvault_manager maidsafe_vault_manager)
+  target_link_libraries(TESTvault_manager maidsafe_vault_manager maidsafe_test)
   target_link_libraries(dummy_vault maidsafe_vault_manager)
   add_dependencies(TESTvault_manager dummy_vault)
 
@@ -90,11 +90,25 @@ if(MaidsafeTesting)
                     ${VaultManagerToolsCommandsAllFiles}
                     ${VaultManagerToolsActionsAllFiles})
   target_include_directories(local_network_controller PRIVATE ${PROJECT_SOURCE_DIR}/src)
-  target_link_libraries(local_network_controller maidsafe_vault_manager maidsafe_nfs_vault)
+  target_link_libraries(local_network_controller maidsafe_vault_manager maidsafe_nfs_vault maidsafe_test)
   add_dependencies(local_network_controller vault)
 
   ms_add_style_test()
   ms_add_gtests(TESTvault_manager)
   ms_add_project_experimental()
   ms_test_summary_output()
+endif()
+
+
+#==================================================================================================#
+# Package                                                                                          #
+#==================================================================================================#
+install(TARGETS maidsafe_vault_manager COMPONENT Development CONFIGURATIONS Debug Release ARCHIVE DESTINATION lib)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ COMPONENT Development DESTINATION include)
+
+if(MaidsafeTesting)
+  install(TARGETS local_network_controller COMPONENT Tools CONFIGURATIONS Debug RUNTIME DESTINATION bin/debug)
+  install(TARGETS local_network_controller COMPONENT Tools CONFIGURATIONS Release RUNTIME DESTINATION bin)
+  install(TARGETS TESTvault_manager dummy_vault COMPONENT Tests CONFIGURATIONS Debug RUNTIME DESTINATION bin/debug)
+  install(TARGETS TESTvault_manager dummy_vault COMPONENT Tests CONFIGURATIONS Release RUNTIME DESTINATION bin)
 endif()

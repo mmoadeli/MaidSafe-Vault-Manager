@@ -59,7 +59,8 @@ void SendStartVaultRequest(TcpConnectionPtr connection, const NonEmptyString& va
                            const fs::path& vault_dir, DiskUsage max_disk_usage) {
   protobuf::StartVaultRequest message;
   message.set_label(vault_label.string());
-  message.set_vault_dir(vault_dir.string());
+  if (!vault_dir.empty())
+    message.set_vault_dir(vault_dir.string());
   message.set_max_disk_usage(max_disk_usage.data);
   connection->Send(WrapMessage(std::make_pair(message.SerializeAsString(),
                    MessageType::kStartVaultRequest)));
@@ -146,14 +147,13 @@ void SendBootstrapContactsRequest(TcpConnectionPtr connection) {
 }
 
 void SendBootstrapContactsResponse(TcpConnectionPtr connection,
-                          const routing::BootstrapContacts& bootstrap_contacts) {
+                                   const routing::BootstrapContacts& bootstrap_contacts) {
   protobuf::BootstrapContactsResponse message;
   message.set_serialised_bootstrap_contacts(
       routing::SerialiseBootstrapContacts(bootstrap_contacts));
   connection->Send(WrapMessage(std::make_pair(message.SerializeAsString(),
                                MessageType::kBootstrapContactsResponse)));
 }
-
 
 void SendVaultShutdownRequest(TcpConnectionPtr connection) {
   connection->Send(WrapMessage(std::make_pair(std::string{}, MessageType::kVaultShutdownRequest)));
@@ -166,7 +166,7 @@ void SendMaxDiskUsageUpdate(TcpConnectionPtr connection, DiskUsage max_disk_usag
                                               MessageType::kMaxDiskUsageUpdate)));
 }
 
-void SendLogMessage(TcpConnectionPtr connection, const std::string log_message) {
+void SendLogMessage(TcpConnectionPtr connection, const std::string& log_message) {
   connection->Send(WrapMessage(std::make_pair(log_message, MessageType::kLogMessage)));
 }
 
