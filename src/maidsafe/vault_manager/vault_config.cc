@@ -83,7 +83,13 @@ passport::Pmid GetPmidFromKeysFile(const boost::filesystem::path keys_path,
       passport::detail::ReadKeyChainList(keys_path));
   if (identity_index >= key_chains.size()) {
     std::cout << "Identity selected out of bounds\n";
+    try {
     BOOST_THROW_EXCEPTION(MakeError(CommonErrors::invalid_parameter));
+    }
+    catch(maidsafe_error& error) {
+      error.AddInfo("VM88888");
+      throw;
+    }
   }
   return passport::Pmid(key_chains.at(identity_index).pmid);
 }

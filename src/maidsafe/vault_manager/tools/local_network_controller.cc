@@ -71,7 +71,13 @@ LocalNetworkController::LocalNetworkController(const boost::filesystem::path& sc
     if (!boost::filesystem::exists(script_path) ||
         !boost::filesystem::is_regular_file(script_path)) {
       TLOG(kRed) << script_path << " doesn't exist or is not a regular file.\n";
+      try {
       BOOST_THROW_EXCEPTION(MakeError(CommonErrors::invalid_parameter));
+      }
+      catch(maidsafe_error& error) {
+        error.AddInfo("VM6666");
+        throw;
+     }
     }
 
     std::ifstream script(script_path.string());

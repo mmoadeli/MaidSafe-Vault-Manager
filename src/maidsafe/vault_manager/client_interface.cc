@@ -186,7 +186,13 @@ void ClientInterface::HandleVaultRunningResponse(const std::string& message) {
     LOG(kError) << "Got error for vault label: " << label.string()
                 << "   Error: " << error->what();
   } else {
+    try {
     throw MakeError(CommonErrors::invalid_parameter);
+    }
+    catch(maidsafe_error& error) {
+      error.AddInfo("VM11111");
+      throw;
+    }
   }
 
   std::lock_guard<std::mutex> lock{ mutex_ };

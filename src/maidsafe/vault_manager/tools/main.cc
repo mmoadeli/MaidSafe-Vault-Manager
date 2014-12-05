@@ -31,8 +31,15 @@ int main(int argc, char* argv[]) {
     auto unuseds(maidsafe::log::Logging::Instance().Initialise(argc, argv));
     if (unuseds.size() == 2U)
       script_path = boost::filesystem::path{ std::string{ &unuseds[1][0] } };
-    else if (unuseds.size() != 1U)
+    else if (unuseds.size() != 1U) {
+      try {
       BOOST_THROW_EXCEPTION(maidsafe::MakeError(maidsafe::CommonErrors::invalid_parameter));
+      }
+      catch(maidsafe::maidsafe_error& error) {
+        error.AddInfo("VM77777");
+        throw;
+      }
+    }
 
     maidsafe::vault_manager::tools::LocalNetworkController local_network_controller{ script_path };
     for (;;) {

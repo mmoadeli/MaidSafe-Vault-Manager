@@ -33,8 +33,15 @@ int main(int argc, char* argv[]) {
   int exit_code{ 0 };
   try {
     auto unuseds(maidsafe::log::Logging::Instance().Initialise(argc, argv));
-    if (unuseds.size() != 2U)
+    if (unuseds.size() != 2U) {
+      try {
       BOOST_THROW_EXCEPTION(maidsafe::MakeError(maidsafe::CommonErrors::invalid_parameter));
+      }
+      catch(maidsafe_error& error) {
+        error.AddInfo("VM12121212");
+        throw;
+      }
+    }
     uint16_t port{ static_cast<uint16_t>(std::stoi(std::string{ &unuseds[1][0] })) };
     maidsafe::vault_manager::VaultInterface vault_interface{ port };
     connected_to_vault_manager = true;
@@ -57,7 +64,13 @@ int main(int argc, char* argv[]) {
         should_hang = true;
         break;
       default:
+        try {
         BOOST_THROW_EXCEPTION(maidsafe::MakeError(maidsafe::CommonErrors::invalid_parameter));
+        }
+        catch(maidsafe_error& error) {
+          error.AddInfo("VM55555");
+          throw;
+        }
     }
     exit_code = vault_interface.WaitForExit();
     worker.get();

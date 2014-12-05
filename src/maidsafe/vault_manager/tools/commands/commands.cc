@@ -98,8 +98,15 @@ bool Command::ConvertAndValidateChoice<int, int, int>(const std::string& choice_
   else
     choice = std::stoi(choice_as_string);
 
-  if (choice < min || choice > max)
+  if (choice < min || choice > max) {
+    try {
     BOOST_THROW_EXCEPTION(MakeError(CommonErrors::invalid_parameter));
+    }
+    catch(maidsafe_error& error) {
+      error.AddInfo("VM101010");
+      throw;
+    }
+  }
 
   return true;
 }
@@ -116,7 +123,13 @@ bool Command::ConvertAndValidateChoice<boost::filesystem::path, bool>(
 
   if (must_exist && !fs::exists(choice)) {
     TLOG(kRed) << "\n" << choice_as_string << " doesn't exist.\n";
+    try {
     BOOST_THROW_EXCEPTION(MakeError(CommonErrors::invalid_parameter));
+    }
+    catch(maidsafe_error& error) {
+      error.AddInfo("3131313131");
+      throw;
+    }
   }
 
   clear_path.Release();
